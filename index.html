@@ -445,46 +445,53 @@ function buildARScene(key){
     `<span class="ar-pill" style="animation-delay:${i*.08+.2}s">
       <span class="dot" style="background:${it.c}"></span>${it.label}</span>`).join('');
 
-  // floating objects positioned in an arc above the caneca
+  // Floating objects arranged in a 2x2 grid CLOSE and CENTERED in front of camera.
+  // They are parented to the camera so they ALWAYS stay in view (no need to aim).
   const n=c.items.length;
   let objs="";
+  const cols=2, gapX=0.55, gapY=0.5, baseZ=-1.6, topY=0.95;
   c.items.forEach((it,i)=>{
-    const ang=(i/(n-1)-0.5)*1.4;          // spread
-    const x=(Math.sin(ang)*1.1).toFixed(2);
-    const y=(0.9+Math.cos(i*1.3)*0.12).toFixed(2);
-    const z=(-2.4+Math.cos(ang)*0.4).toFixed(2);
+    const col=i%cols, row=Math.floor(i/cols);
+    const x=((col)-(cols-1)/2)*gapX;
+    const y=topY - row*gapY;
+    const z=baseZ;
     objs+=`
-    <a-entity position="${x} ${y} ${z}"
-      animation="property=position; to=${x} ${(+y+0.12).toFixed(2)} ${z}; dir=alternate; loop=true; dur=${1600+i*220}; easing=easeInOutSine">
-      <a-entity rotation="0 0 0"
-        animation="property=rotation; to=0 360 0; loop=true; dur=${6000+i*900}; easing=linear">
+    <a-entity position="${x.toFixed(2)} ${y.toFixed(2)} ${z}"
+      scale="1.4 1.4 1.4"
+      animation="property=position; to=${x.toFixed(2)} ${(y+0.07).toFixed(2)} ${z}; dir=alternate; loop=true; dur=${1500+i*180}; easing=easeInOutSine">
+      <a-entity animation="property=rotation; to=0 360 0; loop=true; dur=${5000+i*700}; easing=linear">
         ${buildModel(it.build,it.c)}
       </a-entity>
-      <a-text value="${it.label}" align="center" width="2.4" color="#ffffff"
-        position="0 -0.34 0" baseline="top"
-        geometry="primitive:plane" material="opacity:0"></a-text>
+      <a-entity position="0 -0.28 0">
+        <a-text value="${it.label}" align="center" width="2.0" color="#ffffff"
+          position="0 0 0.01"></a-text>
+        <a-plane width="${0.06+it.label.length*0.062}" height="0.16" color="#000" opacity="0.55"></a-plane>
+      </a-entity>
     </a-entity>`;
   });
 
-  // the caneca itself rendered on the ground in AR
+  // The caneca, also parented to camera so it's always visible below the objects.
+  const colorName=c.name.split(' ')[1].toUpperCase();
   const can=`
-    <a-entity position="0 -0.6 -2.4">
-      <a-box width="0.95" height="1.15" depth="0.7" color="${c.color}" opacity="0.96"></a-box>
-      <a-box width="1.0" height="0.12" depth="0.75" position="0 0.62 0" color="${c.accent}"></a-box>
-      <a-box width="0.7" height="0.5" depth="0.02" position="0 0.05 0.36" color="${c.accent}" opacity="0.6"></a-box>
-      <a-text value="${c.name.split(' ')[1].toUpperCase()}" align="center" width="2.6"
+    <a-entity position="0 -1.0 -1.7" scale="0.9 0.9 0.9">
+      <a-box width="0.95" height="1.15" depth="0.7" color="${c.color}" opacity="0.97"></a-box>
+      <a-box width="1.02" height="0.12" depth="0.78" position="0 0.62 0" color="${c.accent}"></a-box>
+      <a-box width="0.7" height="0.55" depth="0.02" position="0 0.05 0.36" color="${c.accent}" opacity="0.7"></a-box>
+      <a-text value="${colorName}" align="center" width="2.4"
         color="${c.txt}" position="0 0.05 0.38"></a-text>
     </a-entity>`;
 
+  // Camera is FIXED (look-controls disabled) so the parented content stays framed.
   const scene=`
   <a-scene embedded vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false"
            renderer="alpha:true; antialias:true; colorManagement:true"
            background="transparent">
-    <a-entity light="type:ambient; intensity:0.85"></a-entity>
-    <a-entity light="type:directional; intensity:0.7" position="1 3 2"></a-entity>
-    ${can}
-    ${objs}
-    <a-entity camera look-controls="reverseTouchDrag:true" position="0 0 0"></a-entity>
+    <a-entity light="type:ambient; intensity:0.95"></a-entity>
+    <a-entity light="type:directional; intensity:0.6" position="1 3 2"></a-entity>
+    <a-entity id="arCam" camera look-controls="enabled:false" position="0 0 0">
+      ${can}
+      ${objs}
+    </a-entity>
   </a-scene>`;
 
   document.getElementById('arSceneHost').innerHTML=scene;
@@ -506,8 +513,19 @@ async function startARCamera(){
       document.getElementById('ar').prepend(bg);
     }
     bg.srcObject=arStream;await bg.play();
-    document.querySelector('#ar a-scene').style.position='relative';
-    document.querySelector('#ar a-scene').style.zIndex='1';
+    const sc=document.querySelector('#ar a-scene');
+    if(sc){
+      sc.style.position='absolute';
+      sc.style.inset='0';
+      sc.style.width='100%';
+      sc.style.height='100%';
+      sc.style.zIndex='1';
+      sc.style.background='transparent';
+      // ensure the rendered canvas itself is transparent and full-size
+      const fix=()=>{const cv=sc.querySelector('canvas');
+        if(cv){cv.style.background='transparent';cv.style.width='100%';cv.style.height='100%';}};
+      fix(); sc.addEventListener('loaded',fix); setTimeout(fix,400);
+    }
   }catch(e){
     document.getElementById('arSceneHost').style.background=
       'radial-gradient(circle at 50% 30%, #16321f, #060c08)';
