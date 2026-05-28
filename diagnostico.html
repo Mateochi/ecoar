@@ -20,16 +20,22 @@
     background:#1f8a4c;color:#fff;}
   button.alt{background:#333;}
 </style>
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"
-        onload="L('A-Frame cargado (aframe.io)','ok')"
-        onerror="L('aframe.io falló, probando jsDelivr...','warn');loadFallbackAframe()"></script>
+<script src="aframe.min.js"
+        onload="L('A-Frame cargado (local desde el repo)','ok')"
+        onerror="L('aframe.min.js local no encontrado, probando CDN...','warn');loadFallbackAframe()"></script>
 <script>
 function loadFallbackAframe(){
   if(window.AFRAME){return;}
   var s=document.createElement('script');
-  s.src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js";
-  s.onload=function(){L('A-Frame cargado (jsDelivr fallback)','ok');};
-  s.onerror=function(){L('NO se pudo cargar A-Frame de ningún CDN. Baja el escudo de Brave (león) y recarga.','bad');};
+  s.src="https://aframe.io/releases/1.5.0/aframe.min.js";
+  s.onload=function(){L('A-Frame cargado (aframe.io CDN)','ok');};
+  s.onerror=function(){
+    var s2=document.createElement('script');
+    s2.src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js";
+    s2.onload=function(){L('A-Frame cargado (jsDelivr)','ok');};
+    s2.onerror=function(){L('NO se pudo cargar A-Frame por ningun medio.','bad');};
+    document.head.appendChild(s2);
+  };
   document.head.appendChild(s);
 }
 </script>
