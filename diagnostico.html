@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EcoAR · Diagnóstico</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;background:#0a120d;color:#eafff0;font-family:system-ui,sans-serif;overflow:hidden;}
+  #log{position:fixed;top:0;left:0;right:0;z-index:99;padding:10px 12px;
+    background:rgba(0,0,0,.78);font-size:12.5px;line-height:1.5;max-height:42vh;overflow:auto;}
+  #log b{color:#7CFFB0;}
+  .ok{color:#7CFFB0;} .bad{color:#ff8d7a;} .warn{color:#ffd479;}
+  #stage{position:fixed;inset:0;}
+  #arbg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;}
+  a-scene,canvas{position:absolute!important;inset:0;width:100%!important;height:100%!important;z-index:1;background:transparent!important;}
+  #buttons{position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;gap:8px;padding:12px;
+    background:linear-gradient(0deg,#0a120d,transparent);}
+  button{flex:1;padding:13px;border:none;border-radius:9px;font-size:14px;font-weight:700;
+    background:#1f8a4c;color:#fff;}
+  button.alt{background:#333;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"
+        onload="L('A-Frame script cargado','ok')"
+        onerror="L('NO se pudo cargar A-Frame (revisa internet / bloqueo)','bad')"></script>
+</head>
+<body>
+<div id="log"><b>EcoAR · Diagnóstico</b><br></div>
+<div id="stage"><video id="arbg" playsinline muted autoplay></video><div id="host"></div></div>
+<div id="buttons">
+  <button onclick="test3D()">1 · Probar 3D</button>
+  <button onclick="testCam()" class="alt">2 · Probar cámara</button>
+  <button onclick="testAR()">3 · AR completa</button>
+</div>
+
+<script>
+function L(msg,cls){const d=document.getElementById('log');
+  d.innerHTML+='<span class="'+(cls||'')+'">• '+msg+'</span><br>';d.scrollTop=d.scrollHeight;
+  console.log('[diag]',msg);}
+
+// initial environment checks
+window.addEventListener('DOMContentLoaded',()=>{
+  L('Página cargada. URL: '+location.href);
+  L('Protocolo: '+location.protocol+(location.protocol==='https:'?' (OK para cámara)':' (¡necesita https!)'),
+    location.protocol==='https:'?'ok':'bad');
+  // WebGL check
+  try{
+    const cv=document.createElement('canvas');
+    const gl=cv.getContext('webgl')||cv.getContext('experimental-webgl');
+    if(gl){L('WebGL disponible (el 3D puede renderizar)','ok');}
+    else{L('WebGL NO disponible — el 3D no se verá. En Brave: baja el escudo (león) y activa hardware acceleration','bad');}
+  }catch(e){L('Error comprobando WebGL: '+e.message,'bad');}
+  // camera API check
+  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){L('API de cámara disponible','ok');}
+  else{L('API de cámara NO disponible en este navegador','bad');}
+  setTimeout(()=>{ if(window.AFRAME) L('AFRAME global presente, versión '+AFRAME.version,'ok');
+    else L('AFRAME NO está definido (no cargó)','bad'); },800);
+});
+
+function clearStage(){document.getElementById('host').innerHTML='';}
+
+// TEST 1: render 3D over a solid background (no camera) ------------
+function test3D(){
+  clearStage();
+  L('Test 3D: montando escena con fondo verde sólido...','warn');
+  document.getElementById('arbg').style.display='none';
+  const scene=`
+  <a-scene embedded vr-mode-ui="enabled:false" renderer="antialias:true"
+           style="background:#16321f">
+    <a-entity light="type:ambient; intensity:1"></a-entity>
+    <a-box position="0 0 -2.5" rotation="0 45 0" color="#4fa3d1"
+      animation="property=rotation; to=0 405 0; loop=true; dur=4000; easing=linear"></a-box>
+    <a-sphere position="-1 0.6 -2.5" radius="0.4" color="#e0b83a"></a-sphere>
+    <a-cylinder position="1 -0.4 -2.5" radius="0.3" height="0.9" color="#1f8a4c"></a-cylinder>
+    <a-text value="3D OK" position="0 1.3 -2.5" align="center" width="6" color="#ffffff"></a-text>
+    <a-entity camera look-controls="enabled:false" position="0 0 0"></a-entity>
+  </a-scene>`;
+  document.getElementById('host').innerHTML=scene;
+  const sc=document.querySelector('a-scene');
+  sc.addEventListener('loaded',()=>L('Escena 3D cargada. ¿Ves un cubo azul girando, una esfera y un cilindro? Si SÍ → el 3D funciona.','ok'));
+  sc.addEventListener('renderstart',()=>L('Render iniciado','ok'));
+  setTimeout(()=>{const cv=sc.querySelector('canvas');
+    L(cv?'Canvas creado ('+cv.width+'x'+cv.height+')':'NO se creó canvas — WebGL bloqueado',cv?'ok':'bad');},1200);
+}
+
+// TEST 2: camera only ----------------------------------------------
+async function testCam(){
+  clearStage();
+  L('Test cámara: pidiendo acceso...','warn');
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const bg=document.getElementById('arbg');
+    bg.srcObject=stream;bg.style.display='block';await bg.play();
+    L('Cámara funcionando. ¿Ves la imagen de tu cámara? Si SÍ → la cámara funciona.','ok');
+  }catch(e){
+    L('Error de cámara: '+e.name+' — '+e.message,'bad');
+    if(e.name==='NotAllowedError')L('Diste "denegar" o Brave la bloqueó. Toca el candado/león en la barra y permite cámara.','warn');
+  }
+}
+
+// TEST 3: full AR (camera + 3D over it) ----------------------------
+async function testAR(){
+  clearStage();
+  L('Test AR completo: cámara + 3D encima...','warn');
+  let camOK=false;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const bg=document.getElementById('arbg');
+    bg.srcObject=stream;bg.style.display='block';await bg.play();camOK=true;
+    L('Cámara montada de fondo','ok');
+  }catch(e){L('Cámara falló: '+e.message+' (mostraré 3D sin fondo de cámara)','warn');}
+  const scene=`
+  <a-scene embedded vr-mode-ui="enabled:false" renderer="alpha:true; antialias:true"
+           style="background:transparent">
+    <a-entity light="type:ambient; intensity:1"></a-entity>
+    <a-entity camera look-controls="enabled:false" position="0 0 0">
+      <a-box position="-0.4 0.4 -1.6" color="#4fa3d1" scale="1.4 1.4 1.4"
+        animation="property=rotation; to=0 360 0; loop=true; dur=5000; easing=linear"></a-box>
+      <a-cylinder position="0.4 0.4 -1.6" radius="0.18" height="0.5" color="#b8bcc4"
+        animation="property=rotation; to=0 360 0; loop=true; dur=6000; easing=linear"></a-cylinder>
+      <a-box position="-0.4 -0.2 -1.6" color="#c89b5e" scale="1.3 1.1 1.3"></a-box>
+      <a-sphere position="0.4 -0.2 -1.6" radius="0.22" color="#e0b83a"></a-sphere>
+      <a-text value="AR OK" position="0 0.95 -1.6" align="center" width="4" color="#7CFFB0"></a-text>
+    </a-entity>
+  </a-scene>`;
+  document.getElementById('host').innerHTML=scene;
+  const sc=document.querySelector('a-scene');
+  sc.addEventListener('loaded',()=>{
+    const cv=sc.querySelector('canvas');
+    if(cv){cv.style.background='transparent';}
+    L(camOK?'¿Ves objetos 3D flotando sobre tu cámara? Si SÍ → AR funciona completo.'
+           :'¿Ves objetos 3D sobre fondo transparente? El 3D va, faltó la cámara.','ok');
+  });
+}
+</script>
+</body>
+</html>
