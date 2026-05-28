@@ -4,22 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>EcoAR · Clasificación de Residuos</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="jsQR.min.js"></script>
+<script>if(!window.jsQR){var s=document.createElement('script');s.src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";document.head.appendChild(s);}</script>
+<script src="qrcode.min.js"></script>
+<script>if(!window.QRCode){var s2=document.createElement('script');s2.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";document.head.appendChild(s2);}</script>
+<!-- A-Frame cargado LOCALMENTE desde el repo (no depende de CDN externo) -->
+<script src="aframe.min.js"></script>
 <script>
-  // Fallback: si A-Frame no cargó desde aframe.io, intentar jsDelivr y luego cdnjs
+  // Fallback a CDN solo si el archivo local no existe por alguna razón
   (function(){
     if(window.AFRAME) return;
     var sources=[
-      "https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js",
-      "https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"
+      "https://aframe.io/releases/1.5.0/aframe.min.js",
+      "https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js"
     ];
     (function tryNext(i){
       if(window.AFRAME || i>=sources.length) return;
       var s=document.createElement('script');
       s.src=sources[i];
-      s.onload=function(){console.log('A-Frame cargado desde fallback:',sources[i]);};
+      s.onload=function(){console.log('A-Frame desde fallback:',sources[i]);};
       s.onerror=function(){tryNext(i+1);};
       document.head.appendChild(s);
     })(0);
@@ -154,7 +157,8 @@
 
   /* ---------- AR ---------- */
   #ar{background:#000;}
-  a-scene{width:100%;height:100%;}
+  #arSceneHost{position:absolute;inset:0;width:100%;height:100%;}
+  #ar a-scene,#ar canvas{position:absolute!important;top:0;left:0;width:100%!important;height:100%!important;}
   .ar-hud{position:absolute;inset:0;pointer-events:none;z-index:10;}
   .ar-top{position:absolute;top:0;left:0;right:0;padding:18px 20px;
     background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);}
@@ -482,50 +486,53 @@ function buildARScene(key){
     `<span class="ar-pill" style="animation-delay:${i*.08+.2}s">
       <span class="dot" style="background:${it.c}"></span>${it.label}</span>`).join('');
 
-  // Floating objects arranged in a 2x2 grid CLOSE and CENTERED in front of camera.
-  // They are parented to the camera so they ALWAYS stay in view (no need to aim).
-  const n=c.items.length;
+  // Objetos flotando en cuadrícula 2x2, centrados frente a la cámara.
   let objs="";
-  const cols=2, gapX=0.55, gapY=0.5, baseZ=-1.6, topY=0.95;
+  const cols=2, gapX=0.6, gapY=0.55, baseZ=-2.0, topY=0.7;
   c.items.forEach((it,i)=>{
     const col=i%cols, row=Math.floor(i/cols);
-    const x=((col)-(cols-1)/2)*gapX;
+    const x=(col-(cols-1)/2)*gapX;
     const y=topY - row*gapY;
-    const z=baseZ;
     objs+=`
-    <a-entity position="${x.toFixed(2)} ${y.toFixed(2)} ${z}"
-      scale="1.4 1.4 1.4"
-      animation="property=position; to=${x.toFixed(2)} ${(y+0.07).toFixed(2)} ${z}; dir=alternate; loop=true; dur=${1500+i*180}; easing=easeInOutSine">
+    <a-entity position="${x.toFixed(2)} ${y.toFixed(2)} ${baseZ}" scale="1.5 1.5 1.5"
+      animation="property=position; to=${x.toFixed(2)} ${(y+0.08).toFixed(2)} ${baseZ}; dir=alternate; loop=true; dur=${1500+i*180}; easing=easeInOutSine">
       <a-entity animation="property=rotation; to=0 360 0; loop=true; dur=${5000+i*700}; easing=linear">
         ${buildModel(it.build,it.c)}
       </a-entity>
-      <a-entity position="0 -0.28 0">
-        <a-text value="${it.label}" align="center" width="2.0" color="#ffffff"
-          position="0 0 0.01"></a-text>
-        <a-plane width="${0.06+it.label.length*0.062}" height="0.16" color="#000" opacity="0.55"></a-plane>
+      <a-entity position="0 -0.3 0">
+        <a-plane width="${(0.12+it.label.length*0.066).toFixed(2)}" height="0.18" color="#000" opacity="0.6"></a-plane>
+        <a-text value="${it.label}" align="center" width="2.0" color="#ffffff" position="0 0 0.01"></a-text>
       </a-entity>
     </a-entity>`;
   });
 
-  // The caneca, also parented to camera so it's always visible below the objects.
+  // Caneca debajo, en el mundo.
   const colorName=c.name.split(' ')[1].toUpperCase();
   const can=`
-    <a-entity position="0 -1.0 -1.7" scale="0.9 0.9 0.9">
+    <a-entity position="0 -1.15 -2.0">
       <a-box width="0.95" height="1.15" depth="0.7" color="${c.color}" opacity="0.97"></a-box>
       <a-box width="1.02" height="0.12" depth="0.78" position="0 0.62 0" color="${c.accent}"></a-box>
-      <a-box width="0.7" height="0.55" depth="0.02" position="0 0.05 0.36" color="${c.accent}" opacity="0.7"></a-box>
-      <a-text value="${colorName}" align="center" width="2.4"
-        color="${c.txt}" position="0 0.05 0.38"></a-text>
+      <a-box width="0.72" height="0.55" depth="0.02" position="0 0.05 0.36" color="${c.accent}" opacity="0.75"></a-box>
+      <a-text value="${colorName}" align="center" width="2.2" color="${c.txt}" position="0 0.05 0.38"></a-text>
     </a-entity>`;
 
-  // Camera is FIXED (look-controls disabled) so the parented content stays framed.
+  // Una sola <a-scene>. El fondo de cámara se mete como textura de video
+  // en un plano gigante anclado a la cámara (patrón estable de WebAR).
   const scene=`
-  <a-scene embedded vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false"
-           renderer="alpha:true; antialias:true; colorManagement:true"
-           background="transparent">
-    <a-entity light="type:ambient; intensity:0.95"></a-entity>
-    <a-entity light="type:directional; intensity:0.6" position="1 3 2"></a-entity>
-    <a-entity id="arCam" camera look-controls="enabled:false" position="0 0 0">
+  <a-scene vr-mode-ui="enabled:false" embedded
+           renderer="alpha:true; antialias:true"
+           device-orientation-permission-ui="enabled:false">
+    <a-assets>
+      <video id="camfeed" autoplay playsinline muted></video>
+    </a-assets>
+    <a-entity light="type:ambient; intensity:1.0"></a-entity>
+    <a-entity light="type:directional; intensity:0.5" position="1 3 2"></a-entity>
+    <a-entity id="rig" position="0 0 0">
+      <a-camera look-controls="enabled:false" wasd-controls="enabled:false" position="0 0 0">
+        <!-- plano de cámara MUY al fondo, llena la vista -->
+        <a-plane id="bgplane" src="#camfeed" position="0 0 -9" width="24" height="16"
+                 material="shader:flat; side:double"></a-plane>
+      </a-camera>
       ${can}
       ${objs}
     </a-entity>
@@ -536,42 +543,33 @@ function buildARScene(key){
   startARCamera();
 }
 
-/* Use real device camera as AR background behind transparent A-Frame canvas */
+/* Conecta la cámara real a la textura de video dentro de A-Frame */
 let arStream=null;
 async function startARCamera(){
+  const video=document.getElementById('camfeed');
   try{
-    arStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
-    let bg=document.getElementById('arbg');
-    if(!bg){
-      bg=document.createElement('video');
-      bg.id='arbg';bg.playsInline=true;bg.muted=true;bg.autoplay=true;
-      Object.assign(bg.style,{position:'absolute',inset:'0',width:'100%',height:'100%',
-        objectFit:'cover',zIndex:'0'});
-      document.getElementById('ar').prepend(bg);
-    }
-    bg.srcObject=arStream;await bg.play();
-    const sc=document.querySelector('#ar a-scene');
-    if(sc){
-      sc.style.position='absolute';
-      sc.style.inset='0';
-      sc.style.width='100%';
-      sc.style.height='100%';
-      sc.style.zIndex='1';
-      sc.style.background='transparent';
-      // ensure the rendered canvas itself is transparent and full-size
-      const fix=()=>{const cv=sc.querySelector('canvas');
-        if(cv){cv.style.background='transparent';cv.style.width='100%';cv.style.height='100%';}};
-      fix(); sc.addEventListener('loaded',fix); setTimeout(fix,400);
+    arStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:"environment"}}, audio:false
+    });
+    if(video){
+      video.srcObject=arStream;
+      await video.play().catch(()=>{});
+      // refrescar la textura una vez que el video tenga datos
+      const refresh=()=>{const p=document.getElementById('bgplane');
+        if(p&&p.getObject3D('mesh')){const m=p.getObject3D('mesh').material;
+          if(m&&m.map){m.map.needsUpdate=true;}}};
+      video.addEventListener('loadeddata',refresh);
+      setTimeout(refresh,500);
     }
   }catch(e){
-    document.getElementById('arSceneHost').style.background=
-      'radial-gradient(circle at 50% 30%, #16321f, #060c08)';
-    toast("Sin cámara: mostrando AR en fondo simulado");
+    // sin cámara: fondo degradado para que igual se vea la escena
+    const p=document.getElementById('bgplane');
+    if(p) p.setAttribute('material','shader:flat; color:#16321f');
+    toast("Sin cámara — se muestra el 3D sobre fondo verde");
   }
 }
 function teardownAR(){
   if(arStream){arStream.getTracks().forEach(t=>t.stop());arStream=null;}
-  const bg=document.getElementById('arbg'); if(bg) bg.remove();
   document.getElementById('arSceneHost').innerHTML='';
 }
 function exitAR(){teardownAR();show('home');}
