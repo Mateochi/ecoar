@@ -160,26 +160,28 @@
   #arSceneHost{position:absolute;inset:0;width:100%;height:100%;}
   #ar a-scene,#ar canvas{position:absolute!important;top:0;left:0;width:100%!important;height:100%!important;}
   .ar-hud{position:absolute;inset:0;pointer-events:none;z-index:10;}
-  .ar-top{position:absolute;top:0;left:0;right:0;padding:18px 20px;
-    background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);}
-  .ar-can-name{font-size:26px;font-weight:700;letter-spacing:-.01em;text-shadow:0 2px 10px #000;}
-  .ar-can-sub{font-size:13px;opacity:.85;font-style:italic;}
-  .ar-list{position:absolute;left:0;right:0;bottom:108px;padding:0 18px;}
-  .ar-pill{display:inline-flex;align-items:center;gap:8px;margin:4px;font-size:13px;
-    padding:9px 14px;border-radius:30px;background:rgba(0,0,0,.55);
-    backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.18);
-    animation:rise .5s backwards;}
-  .ar-pill .dot{width:9px;height:9px;border-radius:50%;}
+  .ar-top{position:absolute;top:0;left:0;right:0;padding:20px 20px 30px;
+    background:linear-gradient(180deg,rgba(0,0,0,.78),transparent);}
+  .ar-can-name{font-size:28px;font-weight:700;letter-spacing:-.01em;text-shadow:0 2px 12px #000;}
+  .ar-can-sub{font-size:13.5px;opacity:.9;font-style:italic;margin-top:2px;text-shadow:0 1px 6px #000;}
+  .ar-list{position:absolute;left:0;right:0;bottom:150px;padding:0 16px;text-align:center;}
+  .ar-pill{display:inline-flex;align-items:center;gap:7px;margin:4px;font-size:13px;font-weight:600;
+    padding:8px 14px;border-radius:30px;background:rgba(15,20,15,.72);
+    backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);
+    box-shadow:0 4px 16px rgba(0,0,0,.4);animation:rise .5s backwards;}
+  .ar-pill .dot{width:10px;height:10px;border-radius:50%;box-shadow:0 0 8px currentColor;}
   @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-  .ar-tip{position:absolute;left:20px;right:20px;bottom:64px;text-align:center;
-    font-size:12.5px;opacity:.8;font-style:italic;text-shadow:0 1px 6px #000;}
-  .ar-bottom{position:absolute;bottom:0;left:0;right:0;padding:16px 24px 22px;
+  .ar-tip{position:absolute;left:24px;right:24px;bottom:104px;text-align:center;
+    font-size:13px;opacity:.92;font-style:italic;line-height:1.4;
+    color:#eafff0;text-shadow:0 1px 8px #000, 0 0 20px rgba(0,0,0,.6);}
+  .ar-bottom{position:absolute;bottom:0;left:0;right:0;padding:14px 20px 22px;
     display:flex;gap:10px;pointer-events:auto;
-    background:linear-gradient(0deg,rgba(0,0,0,.75),transparent);}
-  .ar-bottom .btn{padding:13px;font-size:13px;}
-  .toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    background:rgba(0,0,0,.82);padding:14px 22px;border-radius:10px;font-size:14px;
-    border:1px solid var(--verde);z-index:30;opacity:0;transition:opacity .3s;}
+    background:linear-gradient(0deg,rgba(0,0,0,.82),transparent);}
+  .ar-bottom .btn{padding:14px;font-size:13px;border-radius:11px;}
+  .toast{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);
+    background:rgba(10,16,12,.9);padding:14px 22px;border-radius:12px;font-size:14px;
+    border:1px solid var(--verde);z-index:30;opacity:0;transition:opacity .3s;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:80%;text-align:center;}
   .toast.show{opacity:1;}
 </style>
 </head>
@@ -306,10 +308,10 @@ const CANECAS = {
     color:"#1f8a4c", accent:"#0d5a30", txt:"#ffffff",
     tip:"Los restos de comida van aquí. No mezcles con bolsas plásticas.",
     items:[
-      {label:"Cáscara de fruta", c:"#e0b83a", build:"peel"},
+      {label:"Cáscara de fruta", c:"#e0b83a", build:"fruit"},
       {label:"Restos de comida", c:"#8a5a2b", build:"box"},
       {label:"Hojas / poda", c:"#3f7d2a", build:"leaf"},
-      {label:"Cáscara de huevo", c:"#efe6d2", build:"can"}
+      {label:"Cáscara de huevo", c:"#efe6d2", build:"egg"}
     ]
   }
 };
@@ -388,8 +390,14 @@ let stream=null, scanning=false, video=document.getElementById('scanvideo');
 async function openScanner(){
   show('scanner');
   try{
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:"environment"},
+        width:{ideal:1280}, height:{ideal:720}
+      }, audio:false
+    });
     video.srcObject=stream; await video.play();
+    document.getElementById('scanMsg').textContent="Enfoca un código QR";
     scanning=true; tickScan();
   }catch(e){
     document.getElementById('scanMsg').textContent="Sin cámara — usa los botones de prueba";
@@ -400,16 +408,23 @@ function reopenScanner(){teardownAR();openScanner();}
 function stopCam(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}}
 
 const qc=document.getElementById('qrcanvas'), qx=qc.getContext('2d',{willReadFrequently:true});
+let scanFrame=0;
 function tickScan(){
   if(!scanning) return;
   if(video.readyState===video.HAVE_ENOUGH_DATA){
+    scanFrame++;
     qc.width=video.videoWidth; qc.height=video.videoHeight;
     qx.drawImage(video,0,0,qc.width,qc.height);
     const img=qx.getImageData(0,0,qc.width,qc.height);
-    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+    // Alternar el modo de inversión cada frame para detectar QR en cualquier contraste
+    const mode = (scanFrame%2===0) ? "attemptBoth" : "dontInvert";
+    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:mode});
     if(code){
       const can = resolveScan(code.data);
-      if(can){ stopCam(); launchAR(can); return; }
+      if(can){
+        document.getElementById('scanMsg').textContent="✓ Código detectado";
+        stopCam(); launchAR(can); return;
+      }
     }
   }
   requestAnimationFrame(tickScan);
@@ -456,24 +471,47 @@ function launchAR(key){
 }
 
 function buildModel(build,color){
-  // returns an a-entity string representing the waste object
+  // Modelos 3D compuestos y reconocibles. Materiales con algo de brillo.
+  const mat=(c,extra='')=>`material="color:${c}; metalness:0.1; roughness:0.6; ${extra}"`;
   switch(build){
     case "bottle": return `
-      <a-cylinder radius="0.13" height="0.42" color="${color}" opacity="0.92" segments-radial="14"></a-cylinder>
-      <a-cylinder radius="0.06" height="0.12" position="0 0.27 0" color="#3a7" ></a-cylinder>`;
+      <a-cylinder radius="0.12" height="0.34" position="0 0 0" ${mat(color,'opacity:0.85; transparent:true')} segments-radial="20"></a-cylinder>
+      <a-cylinder radius="0.12" height="0.1" position="0 -0.18 0" ${mat(color,'opacity:0.85; transparent:true')} segments-radial="20"></a-cylinder>
+      <a-cone radius-bottom="0.12" radius-top="0.045" height="0.12" position="0 0.23 0" ${mat(color,'opacity:0.85; transparent:true')}></a-cone>
+      <a-cylinder radius="0.045" height="0.08" position="0 0.32 0" ${mat(color,'opacity:0.9; transparent:true')}></a-cylinder>
+      <a-cylinder radius="0.052" height="0.05" position="0 0.37 0" ${mat('#2f9e5e')}></a-cylinder>
+      <a-cylinder radius="0.125" height="0.13" position="0 -0.02 0" ${mat('#ffffff','opacity:0.85; transparent:true')} segments-radial="20"></a-cylinder>`;
     case "can": return `
-      <a-cylinder radius="0.12" height="0.3" color="${color}"></a-cylinder>`;
+      <a-cylinder radius="0.115" height="0.32" ${mat(color,'metalness:0.7; roughness:0.25')} segments-radial="20"></a-cylinder>
+      <a-torus radius="0.1" radius-tubular="0.018" position="0 0.16 0" rotation="90 0 0" ${mat('#d8d8da','metalness:0.8')}></a-torus>
+      <a-cylinder radius="0.1" height="0.02" position="0 0.165 0" ${mat('#c8c8cc','metalness:0.8')}></a-cylinder>
+      <a-cylinder radius="0.115" height="0.16" position="0 0 0" ${mat('#ffffff','metalness:0.3; opacity:0.92; transparent:true')} segments-radial="20"></a-cylinder>`;
     case "box": return `
-      <a-box width="0.3" height="0.26" depth="0.3" color="${color}"></a-box>`;
+      <a-box width="0.34" height="0.3" depth="0.34" ${mat(color)}></a-box>
+      <a-box width="0.345" height="0.02" depth="0.18" position="0 0.155 -0.085" rotation="-28 0 0" ${mat(color)}></a-box>
+      <a-box width="0.345" height="0.02" depth="0.18" position="0 0.155 0.085" rotation="28 0 0" ${mat(color)}></a-box>
+      <a-box width="0.05" height="0.31" depth="0.001" position="0 0 0.171" ${mat('#b07a3a','opacity:0.8; transparent:true')}></a-box>`;
     case "paper": return `
-      <a-box width="0.34" height="0.02" depth="0.26" color="${color}" rotation="6 0 4"></a-box>
-      <a-box width="0.34" height="0.02" depth="0.26" color="${color}" position="0 0.05 0" rotation="-5 8 0"></a-box>`;
-    case "peel": return `
-      <a-torus radius="0.12" radius-tubular="0.035" color="${color}" rotation="60 0 0"></a-torus>`;
+      <a-box width="0.32" height="0.025" depth="0.24" position="0 -0.03 0" rotation="3 0 2" ${mat(color)}></a-box>
+      <a-box width="0.32" height="0.025" depth="0.24" position="0 0 0" rotation="-4 6 0" ${mat('#f2ede0')}></a-box>
+      <a-box width="0.32" height="0.025" depth="0.24" position="0 0.03 0" rotation="2 -5 3" ${mat(color)}></a-box>
+      <a-box width="0.26" height="0.002" depth="0.02" position="0 0.045 0.05" ${mat('#9a9a9a','opacity:0.5; transparent:true')}></a-box>
+      <a-box width="0.26" height="0.002" depth="0.02" position="0 0.045 0" ${mat('#9a9a9a','opacity:0.5; transparent:true')}></a-box>`;
+    case "fruit": return `
+      <a-sphere radius="0.15" scale="1 0.92 1" ${mat(color,'roughness:0.4')}></a-sphere>
+      <a-sphere radius="0.04" position="0 0.12 0" scale="1 0.5 1" ${mat(color,'roughness:0.4')}></a-sphere>
+      <a-cylinder radius="0.012" height="0.09" position="0 0.17 0" ${mat('#6b4423')}></a-cylinder>
+      <a-sphere radius="0.035" position="0.05 0.2 0.02" scale="1.6 0.5 1" rotation="0 0 35" ${mat('#4e8a3a')}></a-sphere>`;
     case "leaf": return `
-      <a-sphere radius="0.14" scale="1 0.45 0.7" color="${color}"></a-sphere>`;
-    default: return `<a-sphere radius="0.14" color="${color}"></a-sphere>`;
+      <a-sphere radius="0.13" scale="1.5 0.35 0.8" rotation="0 0 18" ${mat(color,'roughness:0.7')}></a-sphere>
+      <a-sphere radius="0.1" scale="1.5 0.32 0.8" position="0.08 0.05 0.05" rotation="0 40 -22" ${mat('#4e9a35','roughness:0.7')}></a-sphere>
+      <a-sphere radius="0.09" scale="1.4 0.3 0.8" position="-0.07 0.04 -0.04" rotation="0 -30 14" ${mat('#357d28','roughness:0.7')}></a-sphere>`;
+    case "egg": return `
+      <a-sphere radius="0.12" scale="0.8 1.15 0.8" ${mat(color,'roughness:0.5')}></a-sphere>
+      <a-sphere radius="0.05" position="0.04 0.08 0.06" scale="0.8 1 0.8" ${mat('#fffaf0','roughness:0.3')}></a-sphere>`;
+    default: return `<a-sphere radius="0.14" ${mat(color)}></a-sphere>`;
   }
+}
 }
 
 function buildARScene(key){
@@ -486,38 +524,48 @@ function buildARScene(key){
     `<span class="ar-pill" style="animation-delay:${i*.08+.2}s">
       <span class="dot" style="background:${it.c}"></span>${it.label}</span>`).join('');
 
+  // Registrar (una sola vez) un componente que gira y flota cada objeto por código,
+  // sin depender del sistema de animación declarativo.
+  if(window.AFRAME && !AFRAME.components['spinfloat']){
+    AFRAME.registerComponent('spinfloat',{
+      schema:{speed:{default:1}, amp:{default:0.08}, phase:{default:0}},
+      init:function(){this.t=this.data.phase; this.baseY=this.el.object3D.position.y;},
+      tick:function(time,dt){
+        if(!dt) return;
+        this.t += dt/1000;
+        const o=this.el.object3D;
+        o.rotation.y += (dt/1000)*this.data.speed;            // giro continuo
+        o.position.y = this.baseY + Math.sin(this.t*2)*this.data.amp; // flotación
+      }
+    });
+  }
+
   // Objetos flotando en cuadrícula 2x2, centrados frente a la cámara.
+  // SIN etiquetas 3D (se solapaban). Los nombres están en las píldoras del HUD.
   let objs="";
-  const cols=2, gapX=0.6, gapY=0.55, baseZ=-2.0, topY=0.7;
+  const cols=2, gapX=0.85, gapY=0.78, baseZ=-2.2, topY=0.55;
   c.items.forEach((it,i)=>{
     const col=i%cols, row=Math.floor(i/cols);
     const x=(col-(cols-1)/2)*gapX;
     const y=topY - row*gapY;
     objs+=`
     <a-entity position="${x.toFixed(2)} ${y.toFixed(2)} ${baseZ}" scale="1.5 1.5 1.5"
-      animation="property=position; to=${x.toFixed(2)} ${(y+0.08).toFixed(2)} ${baseZ}; dir=alternate; loop=true; dur=${1500+i*180}; easing=easeInOutSine">
-      <a-entity animation="property=rotation; to=0 360 0; loop=true; dur=${5000+i*700}; easing=linear">
-        ${buildModel(it.build,it.c)}
-      </a-entity>
-      <a-entity position="0 -0.3 0">
-        <a-plane width="${(0.12+it.label.length*0.066).toFixed(2)}" height="0.18" color="#000" opacity="0.6"></a-plane>
-        <a-text value="${it.label}" align="center" width="2.0" color="#ffffff" position="0 0 0.01"></a-text>
-      </a-entity>
+      spinfloat="speed:${(0.6+i*0.15).toFixed(2)}; amp:0.09; phase:${(i*1.3).toFixed(2)}">
+      ${buildModel(it.build,it.c)}
     </a-entity>`;
   });
 
   // Caneca debajo, en el mundo.
   const colorName=c.name.split(' ')[1].toUpperCase();
   const can=`
-    <a-entity position="0 -1.15 -2.0">
+    <a-entity position="0 -1.25 -2.2">
       <a-box width="0.95" height="1.15" depth="0.7" color="${c.color}" opacity="0.97"></a-box>
       <a-box width="1.02" height="0.12" depth="0.78" position="0 0.62 0" color="${c.accent}"></a-box>
-      <a-box width="0.72" height="0.55" depth="0.02" position="0 0.05 0.36" color="${c.accent}" opacity="0.75"></a-box>
+      <a-box width="0.72" height="0.55" depth="0.02" position="0 0.05 0.36" color="${c.accent}" opacity="0.8"></a-box>
       <a-text value="${colorName}" align="center" width="2.2" color="${c.txt}" position="0 0.05 0.38"></a-text>
     </a-entity>`;
 
-  // Una sola <a-scene>. El fondo de cámara se mete como textura de video
-  // en un plano gigante anclado a la cámara (patrón estable de WebAR).
+  // Una sola <a-scene> con el video de cámara como textura de fondo.
   const scene=`
   <a-scene vr-mode-ui="enabled:false" embedded
            renderer="alpha:true; antialias:true"
@@ -529,7 +577,6 @@ function buildARScene(key){
     <a-entity light="type:directional; intensity:0.5" position="1 3 2"></a-entity>
     <a-entity id="rig" position="0 0 0">
       <a-camera look-controls="enabled:false" wasd-controls="enabled:false" position="0 0 0">
-        <!-- plano de cámara MUY al fondo, llena la vista -->
         <a-plane id="bgplane" src="#camfeed" position="0 0 -9" width="24" height="16"
                  material="shader:flat; side:double"></a-plane>
       </a-camera>
