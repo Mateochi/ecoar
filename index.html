@@ -6,7 +6,25 @@
 <title>EcoAR · Clasificación de Residuos</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"></script>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script>
+  // Fallback: si A-Frame no cargó desde aframe.io, intentar jsDelivr y luego cdnjs
+  (function(){
+    if(window.AFRAME) return;
+    var sources=[
+      "https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"
+    ];
+    (function tryNext(i){
+      if(window.AFRAME || i>=sources.length) return;
+      var s=document.createElement('script');
+      s.src=sources[i];
+      s.onload=function(){console.log('A-Frame cargado desde fallback:',sources[i]);};
+      s.onerror=function(){tryNext(i+1);};
+      document.head.appendChild(s);
+    })(0);
+  })();
+</script>
 <style>
   :root{
     --blanca:#e9ecef; --blanca-deep:#b8c2cc;
@@ -412,7 +430,26 @@ function resolveScan(data){
 }
 
 /* ============ AR SCENE ============ */
-function launchAR(key){ stopCam(); buildARScene(key); }
+function launchAR(key){
+  stopCam();
+  // Asegurar que A-Frame esté cargado antes de construir la escena
+  if(!window.AFRAME){
+    show('ar');
+    document.getElementById('arName').textContent='Cargando AR...';
+    document.getElementById('arSub').textContent='Inicializando motor 3D';
+    let tries=0;
+    const wait=setInterval(()=>{
+      tries++;
+      if(window.AFRAME){clearInterval(wait);buildARScene(key);}
+      else if(tries>40){clearInterval(wait);
+        document.getElementById('arName').textContent='Error al cargar AR';
+        document.getElementById('arSub').textContent='El motor 3D (A-Frame) no se pudo cargar. Revisa tu conexión o baja el escudo de Brave (icono del león) y recarga.';
+      }
+    },200);
+    return;
+  }
+  buildARScene(key);
+}
 
 function buildModel(build,color){
   // returns an a-entity string representing the waste object
