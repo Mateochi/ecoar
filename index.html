@@ -342,21 +342,28 @@ function qrTarget(can){
 
 function makeQR(id,can,dark){
   const host = document.getElementById(id);
+  if(!host) return;
   host.innerHTML = "";
-  new QRCode(host,{
-    text: qrTarget(can), width:130, height:130,
-    colorDark:dark, colorLight:"#ffffff",
-    correctLevel:QRCode.CorrectLevel.M
-  });
+  if(typeof QRCode === "undefined"){
+    // Si la librería no cargó, mostrar el texto en vez de romper la app
+    host.innerHTML = '<div style="font:11px monospace;color:#333;padding:8px;text-align:center;word-break:break-all">'+qrTarget(can)+'</div>';
+    return;
+  }
+  try{
+    new QRCode(host,{
+      text: qrTarget(can), width:130, height:130,
+      colorDark:dark, colorLight:"#ffffff",
+      correctLevel:QRCode.CorrectLevel.M
+    });
+  }catch(e){
+    host.innerHTML = '<div style="font:11px monospace;color:#333;padding:8px;text-align:center;word-break:break-all">'+qrTarget(can)+'</div>';
+  }
 }
 
 function renderAllQR(){
   makeQR("qr-blanca","blanca","#222");
   makeQR("qr-negra","negra","#111");
   makeQR("qr-verde","verde","#0d5a30");
-  // update captions
-  const txt = BASE_URL ? "Abre la app · "+ "?caneca=" : "Texto · ECOAR-";
-  document.querySelectorAll('.qr-cap').forEach(()=>{});
 }
 
 function applyBaseUrl(){
@@ -367,19 +374,20 @@ function applyBaseUrl(){
   const hint = document.getElementById('cfgHint');
   if(BASE_URL){
     hint.innerHTML = "✓ QR actualizados. Apuntan a <b>"+BASE_URL+"?caneca=…</b> — escanéalos con cualquier cámara y abrirán EcoAR directo en la caneca.";
-    // update captions to show URL mode
-    const cans=['ECOAR-BLANCA','ECOAR-NEGRA','ECOAR-VERDE'];
     document.querySelectorAll('.qr-cap').forEach((el,i)=>{el.textContent="Abre la app · "+["blanca","negra","verde"][i];});
   } else {
     hint.textContent = "Sin URL: los QR contienen texto plano y solo funcionan con el escáner interno de la app.";
   }
 }
 
-// init: usar la URL actual si es una página https real; si no, la URL fija de despliegue
-BASE_URL = defaultBase();
-document.getElementById('baseUrl').value = BASE_URL;
-renderAllQR();
-document.querySelectorAll('.qr-cap').forEach((el,i)=>{el.textContent="Abre la app · "+["blanca","negra","verde"][i];});
+// init: blindado con try/catch para que un fallo de QR no rompa escáner ni AR
+try{
+  BASE_URL = defaultBase();
+  const bu = document.getElementById('baseUrl');
+  if(bu) bu.value = BASE_URL;
+  renderAllQR();
+  document.querySelectorAll('.qr-cap').forEach((el,i)=>{el.textContent="Abre la app · "+["blanca","negra","verde"][i];});
+}catch(e){ console.error('Error iniciando QR (no crítico):',e); }
 
 /* ============ SCREEN MGMT ============ */
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -511,7 +519,6 @@ function buildModel(build,color){
       <a-sphere radius="0.05" position="0.04 0.08 0.06" scale="0.8 1 0.8" ${mat('#fffaf0','roughness:0.3')}></a-sphere>`;
     default: return `<a-sphere radius="0.14" ${mat(color)}></a-sphere>`;
   }
-}
 }
 
 function buildARScene(key){
