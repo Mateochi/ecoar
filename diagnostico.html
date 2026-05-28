@@ -20,9 +20,19 @@
     background:#1f8a4c;color:#fff;}
   button.alt{background:#333;}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js"
-        onload="L('A-Frame script cargado','ok')"
-        onerror="L('NO se pudo cargar A-Frame (revisa internet / bloqueo)','bad')"></script>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"
+        onload="L('A-Frame cargado (aframe.io)','ok')"
+        onerror="L('aframe.io falló, probando jsDelivr...','warn');loadFallbackAframe()"></script>
+<script>
+function loadFallbackAframe(){
+  if(window.AFRAME){return;}
+  var s=document.createElement('script');
+  s.src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js";
+  s.onload=function(){L('A-Frame cargado (jsDelivr fallback)','ok');};
+  s.onerror=function(){L('NO se pudo cargar A-Frame de ningún CDN. Baja el escudo de Brave (león) y recarga.','bad');};
+  document.head.appendChild(s);
+}
+</script>
 </head>
 <body>
 <div id="log"><b>EcoAR · Diagnóstico</b><br></div>
